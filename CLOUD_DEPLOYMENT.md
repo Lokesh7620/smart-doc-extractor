@@ -206,7 +206,7 @@ This guide covers deploying your Smart Document Extractor to the cloud for perma
    ```
    SECRET_KEY=<64-char hex>
    DATABASE_URL=<from database>
-   GROQ_API_KEY=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
+   GROQ_API_KEY=your_groq_api_key_here
    FLASK_ENV=production
    FLASK_CONFIG=config_production.ProductionConfig
    ```
