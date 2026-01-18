@@ -1,0 +1,58 @@
+# ============================================================
+# Production Requirements
+# ============================================================
+# Install with: pip install -r requirements.production.txt
+# ============================================================
+
+# Include base requirements
+-r requirements.txt
+
+# ============================================================
+# WSGI Server (choose one based on OS)
+# ============================================================
+
+# For Linux/Unix systems (Recommended)
+gunicorn==21.2.0
+
+# For Windows systems (Alternative to Gunicorn)
+waitress==2.1.2
+
+# ============================================================
+# Production Database Drivers
+# ============================================================
+
+# PostgreSQL (Recommended for production)
+psycopg2-binary==2.9.9
+
+# MySQL (Alternative)
+# PyMySQL==1.1.0
+
+# ============================================================
+# Production Web Server
+# ============================================================
+
+# Reverse proxy support
+gevent==23.9.1
+
+# ============================================================
+# Security & Performance
+# ============================================================
+
+# Environment variables validation
+python-decouple==3.8
+
+# Security headers
+flask-talisman==1.1.0
+
+# Rate limiting
+flask-limiter==3.5.0
+
+# Logging
+python-json-logger==2.0.7
+
+# ============================================================
+# Monitoring (Optional)
+# ============================================================
+
+# Application monitoring
+# sentry-sdk[flask]==1.39.2

@@ -1,0 +1,26 @@
+[Unit]
+Description=Smart Document Extractor
+After=network.target
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+RuntimeDirectory=document-extractor
+WorkingDirectory=/var/www/document-extractor
+Environment="PATH=/var/www/document-extractor/venv/bin"
+Environment="FLASK_ENV=production"
+ExecStart=/var/www/document-extractor/venv/bin/gunicorn \
+    --bind 0.0.0.0:8000 \
+    --workers 4 \
+    --worker-class gevent \
+    --timeout 120 \
+    --log-level info \
+    --access-logfile /var/log/document-extractor/access.log \
+    --error-logfile /var/log/document-extractor/error.log \
+    wsgi:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: smart-doc-extractor
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.production.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 wsgi:app
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_CONFIG
+        value: config_production.ProductionConfig
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: document-extractor-db
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+
+databases:
+  - name: document-extractor-db
+    plan: free
+    databaseName: document_extractor
+    user: dbuser

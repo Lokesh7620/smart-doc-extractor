@@ -1,0 +1,340 @@
+@echo off
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
+
+if not exist venv (
+    echo Creating virtual environment...
+    python -m venv venv
+)
+
+call venv\Scripts\activate.bat
+pip install -q --upgrade pip 2>nul
+pip install -q -r requirements.txt 2>nul
+
+if not exist .env (
+    echo SECRET_KEY=sk-dev > .env
+    echo GROQ_API_KEY=org_01kew89rgkfn9vj1mj2a28van6 >> .env
+    echo FLASK_ENV=development >> .env
+)
+
+mkdir static\uploads 2>nul
+mkdir instance 2>nul
+
+echo.
+echo ============================================
+echo Starting Smart Document Extractor
+echo http://127.0.0.1:5000
+echo ============================================
+echo.
+
+python app.py
+pause
+
+#!/usr/bin/env python3
+"""
+Smart Document Extractor - Complete Auto Setup & Run
+Creates all necessary files and launches the application
+"""
+
+import os
+import sys
+import subprocess
+import platform
+import json
+from pathlib import Path
+from time import sleep
+
+class AppLauncher:
+    def __init__(self):
+        self.project_root = Path(__file__).parent if __file__ else Path.cwd()
+        self.venv_path = self.project_root / "venv"
+        self.is_windows = platform.system() == "Windows"
+        self.python_exe = sys.executable
+        
+    def log(self, msg, level="INFO"):
+        """Print formatted log message"""
+        symbols = {"INFO": "ℹ", "OK": "✓", "ERROR": "✗", "WARN": "⚠", "STEP": "→"}
+        symbol = symbols.get(level, "•")
+        print(f"  {symbol} {msg}")
+    
+    def header(self, text):
+        """Print section header"""
+        print("\n" + "="*80)
+        print(f"  {text}".center(80))
+        print("="*80 + "\n")
+    
+    def run_cmd(self, cmd, silent=False):
+        """Execute command"""
+        try:
+            if isinstance(cmd, str):
+                result = subprocess.run(cmd, shell=True, capture_output=silent)
+            else:
+                result = subprocess.run(cmd, capture_output=silent)
+            return result.returncode == 0
+        except Exception as e:
+            self.log(f"Command failed: {e}", "ERROR")
+            return False
+    
+    def check_python(self):
+        """Verify Python version"""
+        self.header("Step 1: Checking Python Installation")
+        version = sys.version_info
+        self.log(f"Python {version.major}.{version.minor}.{version.micro}", "OK")
+        
+        if version.major < 3 or (version.major == 3 and version.minor < 8):
+            self.log("Python 3.8+ required!", "ERROR")
+            return False
+        return True
+    
+    def setup_venv(self):
+        """Create virtual environment"""
+        self.header("Step 2: Setting Up Virtual Environment")
+        
+        if self.venv_path.exists():
+            self.log(f"Virtual environment exists at {self.venv_path}", "OK")
+            return True
+        
+        self.log("Creating virtual environment...", "STEP")
+        if self.run_cmd([self.python_exe, "-m", "venv", str(self.venv_path)]):
+            self.log("Virtual environment created", "OK")
+            return True
+        else:
+            self.log("Failed to create virtual environment", "ERROR")
+            return False
+    
+    def get_pip_exe(self):
+        """Get pip path from venv"""
+        if self.is_windows:
+            return str(self.venv_path / "Scripts" / "pip.exe")
+        return str(self.venv_path / "bin" / "pip")
+    
+    def get_python_exe(self):
+        """Get Python path from venv"""
+        if self.is_windows:
+            return str(self.venv_path / "Scripts" / "python.exe")
+        return str(self.venv_path / "bin" / "python")
+    
+    def install_dependencies(self):
+        """Install packages from requirements.txt"""
+        self.header("Step 3: Installing Dependencies")
+        
+        req_file = self.project_root / "requirements.txt"
+        if not req_file.exists():
+            self.log("requirements.txt not found", "ERROR")
+            return False
+        
+        pip_exe = self.get_pip_exe()
+        
+        self.log("Upgrading pip...", "STEP")
+        self.run_cmd([pip_exe, "install", "--upgrade", "pip"], silent=True)
+        
+        self.log("Installing packages (this may take 5-10 minutes)...", "STEP")
+        if self.run_cmd([pip_exe, "install", "-r", str(req_file)]):
+            self.log("All dependencies installed", "OK")
+            return True
+        else:
+            self.log("Some packages failed to install", "WARN")
+            return False
+    
+    def verify_packages(self):
+        """Verify critical packages"""
+        self.header("Step 4: Verifying Installation")
+        
+        packages = {
+            "flask": "Flask",
+            "cv2": "OpenCV",
+            "PIL": "Pillow",
+            "pytesseract": "Pytesseract",
+            "numpy": "NumPy",
+        }
+        
+        python_exe = self.get_python_exe()
+        all_ok = True
+        
+        for import_name, display_name in packages.items():
+            cmd = [python_exe, "-c", f"import {import_name}"]
+            if self.run_cmd(cmd, silent=True):
+                self.log(display_name, "OK")
+            else:
+                self.log(f"{display_name} - missing", "WARN")
+                all_ok = False
+        
+        return all_ok
+    
+    def setup_env_file(self):
+        """Create .env file"""
+        self.header("Step 5: Setting Up Configuration")
+        
+        env_file = self.project_root / ".env"
+        if env_file.exists():
+            self.log("Configuration file (.env) already exists", "OK")
+            return True
+        
+        self.log("Creating .env file...", "STEP")
+        
+        env_content = f"""# Smart Document Extractor Configuration
+# Auto-generated on {Path(__file__).name}
+
+SECRET_KEY=sk-dev-{os.urandom(32).hex()}
+GROQ_API_KEY=org_01kew89rgkfn9vj1mj2a28van6
+FLASK_ENV=development
+"""
+        
+        try:
+            env_file.write_text(env_content)
+            self.log(".env file created", "OK")
+            return True
+        except Exception as e:
+            self.log(f"Failed to create .env: {e}", "ERROR")
+            return False
+    
+    def create_directories(self):
+        """Create required directories"""
+        self.header("Step 6: Creating Directories")
+        
+        dirs = [
+            "static/uploads",
+            "instance",
+            "templates",
+        ]
+        
+        for dir_name in dirs:
+            dir_path = self.project_root / dir_name
+            try:
+                dir_path.mkdir(parents=True, exist_ok=True)
+                self.log(dir_name, "OK")
+            except Exception as e:
+                self.log(f"Failed to create {dir_name}: {e}", "ERROR")
+                return False
+        
+        return True
+    
+    def start_app(self):
+        """Launch the Flask application"""
+        self.header("Step 7: Starting Application")
+        
+        python_exe = self.get_python_exe()
+        app_file = self.project_root / "app.py"
+        
+        if not app_file.exists():
+            self.log("app.py not found", "ERROR")
+            return False
+        
+        self.log("Flask app starting...", "STEP")
+        self.log("Available at: http://127.0.0.1:5000", "OK")
+        self.log("Press Ctrl+C to stop", "WARN")
+        print()
+        
+        try:
+            subprocess.run([python_exe, str(app_file)], cwd=str(self.project_root))
+            return True
+        except KeyboardInterrupt:
+            print("\n")
+            self.log("Application stopped by user", "OK")
+            return True
+        except Exception as e:
+            self.log(f"Error: {e}", "ERROR")
+            return False
+    
+    def run_all(self):
+        """Run complete setup"""
+        self.header("SMART DOCUMENT EXTRACTOR - AUTO SETUP & LAUNCH")
+        
+        steps = [
+            ("Python Version", self.check_python),
+            ("Virtual Environment", self.setup_venv),
+            ("Dependencies", self.install_dependencies),
+            ("Verification", self.verify_packages),
+            ("Configuration", self.setup_env_file),
+            ("Directories", self.create_directories),
+            ("Application", self.start_app),
+        ]
+        
+        for step_name, step_func in steps:
+            try:
+                if not step_func():
+                    if step_name == "Verification":
+                        self.log(f"Warning in {step_name} - continuing anyway", "WARN")
+                    elif step_name == "Dependencies":
+                        self.log(f"Warning in {step_name} - continuing anyway", "WARN")
+                    else:
+                        self.log(f"Failed at {step_name}", "ERROR")
+                        return False
+            except Exception as e:
+                self.log(f"Error in {step_name}: {e}", "ERROR")
+                return False
+        
+        return True
+
+def main():
+    """Main entry point"""
+    launcher = AppLauncher()
+    
+    try:
+        success = launcher.run_all()
+        sys.exit(0 if success else 1)
+    except KeyboardInterrupt:
+        print("\n\n[CANCELLED] Setup interrupted by user")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n[FATAL ERROR] {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+#!/usr/bin/env python3
+"""Smart Document Extractor - Auto Launcher"""
+import os, sys, subprocess, platform
+from pathlib import Path
+
+root = Path(__file__).parent if __file__ else Path.cwd()
+print(f"\n{'='*70}")
+print("  SMART DOCUMENT EXTRACTOR - AUTO SETUP & LAUNCH".center(70))
+print(f"{'='*70}\n")
+
+# Step 1: Setup venv
+venv = root / "venv"
+is_win = platform.system() == "Windows"
+py = sys.executable
+
+if not venv.exists():
+    print("  [→] Creating virtual environment...")
+    subprocess.run([py, "-m", "venv", str(venv)], capture_output=True)
+    print("  [✓] Virtual environment created\n")
+else:
+    print(f"  [✓] Virtual environment exists\n")
+
+# Get venv python/pip
+if is_win:
+    venv_py = str(venv / "Scripts" / "python.exe")
+    venv_pip = str(venv / "Scripts" / "pip.exe")
+else:
+    venv_py = str(venv / "bin" / "python")
+    venv_pip = str(venv / "bin" / "pip")
+
+# Step 2: Install requirements
+print("  [→] Installing dependencies (this may take a few minutes)...")
+subprocess.run([venv_pip, "install", "-q", "--upgrade", "pip"], 
+               capture_output=True, cwd=str(root))
+result = subprocess.run([venv_pip, "install", "-q", "-r", str(root / "requirements.txt")],
+                       capture_output=True, cwd=str(root))
+print("  [✓] Dependencies installed\n")
+
+# Step 3: Create directories
+print("  [→] Creating directories...")
+(root / "static" / "uploads").mkdir(parents=True, exist_ok=True)
+(root / "instance").mkdir(parents=True, exist_ok=True)
+print("  [✓] Directories created\n")
+
+# Step 4: Setup .env
+env_file = root / ".env"
+if not env_file.exists():
+    print("  [→] Creating .env configuration...")
+    env_file.write_text("SECRET_KEY=sk-dev\nGROQ_API_KEY=org_01kew89rgkfn9vj1mj2a28van6\nFLASK_ENV=development\n")
+    print("  [✓] Configuration file created\n")
+else:
+    print("  [✓] Configuration file exists\n")
+
+# Step 5: Launch app
+print(f"{'='*70}")
+print("  ✓ SETUP COMPLETE -
