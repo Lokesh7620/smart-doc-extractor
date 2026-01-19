@@ -2,19 +2,28 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from models import db, Document
-from utils.advanced_ocr_processor import AdvancedOCRProcessor  # Updated import
 from utils.translator import Translator
 from utils.pdf_generator import PDFGenerator
 from config import Config
 import os
 import uuid
 
+# Import appropriate OCR processor based on environment
+try:
+    from utils.advanced_ocr_processor import AdvancedOCRProcessor
+    ocr_processor = AdvancedOCRProcessor()
+    print("[INFO] Using Advanced OCR Processor (full features)")
+except ImportError as e:
+    print(f"[INFO] Advanced OCR not available, using lightweight version: {e}")
+    from utils.lightweight_ocr_processor import LightweightOCRProcessor
+    ocr_processor = LightweightOCRProcessor()
+    print("[INFO] Using Lightweight OCR Processor (Tesseract only)")
+
 main = Blueprint('main', __name__)
 
 # Initialize processors
 pdf_generator = PDFGenerator()
 translator = Translator(Config.GROQ_API_KEY) if Config.GROQ_API_KEY else None
-ocr_processor = AdvancedOCRProcessor()  # Use the advanced processor
 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
