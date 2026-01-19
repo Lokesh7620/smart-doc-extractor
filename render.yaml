@@ -2,13 +2,14 @@ services:
   - type: web
     name: smart-doc-extractor
     env: python
+    region: oregon
     plan: free
-    buildCommand: pip install -r requirements.production.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 wsgi:app
+    buildCommand: bash build.sh
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 300 wsgi:app
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: 3.11
       - key: FLASK_ENV
         value: production
       - key: FLASK_CONFIG
@@ -24,6 +25,7 @@ services:
 
 databases:
   - name: document-extractor-db
+    region: oregon
     plan: free
     databaseName: document_extractor
     user: dbuser
